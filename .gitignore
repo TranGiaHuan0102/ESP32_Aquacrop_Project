@@ -3,6 +3,6 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
-src/config.h
+config.h
 soil_moisture_server/adafruit_config.env
 soil_moisture_server/.venv
