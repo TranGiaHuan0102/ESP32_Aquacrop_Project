@@ -5,18 +5,12 @@
 #include <WiFi.h>
 #include <SPI.h>
 
-#include "config.h"
-
+// Self implemented 
+#include <watering.h>
+#include <config.h>
 
 #define SOIL_MOISTURE_PIN 34  // Use GPIO34 for analog input of soil moisture sensor
 #define PIN_WIRE_SCL 26 // Use GPIO26 for digital output  of relay
-#define ABSOLUTE_DRYNESS 4095
-
-int calculate_soil_moisture_percentage(int soil_moisture)
-{
-    soil_moisture = constrain(soil_moisture, 0, ABSOLUTE_DRYNESS);  // Force soil_moisture to be within 0 and 4095
-    return map(soil_moisture, ABSOLUTE_DRYNESS, 0, 0, 100);
-}
 
 void connectWiFi()
 {
@@ -44,7 +38,6 @@ WiFiClient espClient;         // Create a WiFi client for ESP32
 AdafruitIO_WiFi io(IO_USERNAME, IO_KEY, SSID, PASSWORD);  // Create an instance of the AdafruitIO_WiFi object
 AdafruitIO_Feed *soil_moisture_feed = io.feed(SOIL_FEED_NAME); // soil_moisture_feed
 AdafruitIO_Feed *relay_command_feed = io.feed(RELAY_FEED_NAME); // relay_command_feed
-
 
 // Use millis to better handle latency
 unsigned long last_connecting_time = 0;  
@@ -108,11 +101,12 @@ void setup() {
 unsigned long last_sensor_read = 0; 
 const long telemetry_interval = 10000;  
 
-
 unsigned long last_reconnect_attempt = 0;
-const long reconnect_interval = 5000; 
+const long reconnect_interval = 5000;
 
+int last_valid_soil_moisture_raw = -1;  // -1 means no valid reading yet
 void loop() {
+
     // Reconnect logic if connection drops, attempt to reconnect once every 5 seconds
     if ((WiFi.status() != WL_CONNECTED || io.status() < AIO_CONNECTED) &&
     millis() - last_reconnect_attempt > reconnect_interval) {
@@ -127,7 +121,13 @@ void loop() {
     {
       last_sensor_read = millis();
 
-      int soil_moisture = calculate_soil_moisture_percentage(analogRead(SOIL_MOISTURE_PIN));
+      int raw = analogRead(SOIL_MOISTURE_PIN);    // Read moisture data
+
+      if (check_reading_validity(raw, last_valid_soil_moisture_raw)){
+          return;
+      }
+
+      int soil_moisture = calculate_soil_moisture_percentage(raw);
 
       // Sending telemetry
       send_telemetry(soil_moisture_feed, soil_moisture);  
