@@ -123,11 +123,13 @@ void loop() {
 
       int raw = analogRead(SOIL_MOISTURE_PIN);    // Read moisture data
 
-      if (check_reading_validity(raw, last_valid_soil_moisture_raw)){
+      if (!check_reading_validity(raw, last_valid_soil_moisture_raw)){
           return;
       }
 
       int soil_moisture = calculate_soil_moisture_percentage(raw);
+
+      last_valid_soil_moisture_raw = raw;
 
       // Sending telemetry
       send_telemetry(soil_moisture_feed, soil_moisture);  
