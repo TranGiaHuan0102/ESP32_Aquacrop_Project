@@ -6,3 +6,5 @@
 config.h
 soil_moisture_server/adafruit_config.env
 soil_moisture_server/.venv
+env
+.venv
