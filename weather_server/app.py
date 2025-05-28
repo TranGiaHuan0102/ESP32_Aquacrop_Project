@@ -1,18 +1,18 @@
 import requests
 import time
-from dotenv import load_dotenv
 import os
 import base64
+from dotenv import load_dotenv
 
 # OpenWeatherMap config
-load_dotenv(dotenv_path='env/weather.env')
+if os.getenv("GITHUB_ACTIONS") != "true":    
+    load_dotenv(dotenv_path='env/weather.env')
+    load_dotenv(dotenv_path='env/adafruit.env')
+
 API_KEY = os.getenv("API_KEY")
 CITY = os.getenv("CITY")
 COUNTRY_CODE = os.getenv("COUNTRY_CODE")
 API_URL = f"http://api.openweathermap.org/data/2.5/forecast?q={CITY},{COUNTRY_CODE}&appid={API_KEY}&units=metric"
-
-# AdafruitIO config
-load_dotenv(dotenv_path='env/adafruit.env')
 ADAFRUIT_IO_USERNAME = os.getenv("ADAFRUIT_IO_USERNAME")
 ADAFRUIT_IO_KEY = os.getenv("ADAFRUIT_IO_KEY")
 RAIN_FEED = os.getenv("RAIN_FEED")
