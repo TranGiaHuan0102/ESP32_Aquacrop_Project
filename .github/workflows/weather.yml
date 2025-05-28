@@ -2,7 +2,7 @@ name: Weather to Adafruit IO
 
 on:
   schedule:
-    - cron: '0 * * * *'  # Run every hour (UTC)
+    - cron: '*/1 * * * *'  # Run every hour (UTC)
   workflow_dispatch:      # Allow manual runs from the GitHub UI
 
 jobs:
