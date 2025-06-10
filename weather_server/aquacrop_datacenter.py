@@ -15,10 +15,13 @@ NASA_FILEPATH = "climate_data\\binhduong_climate_nasa.txt"
 # --- Load NASA data ---
 def load_nasa_data():
     # Assume compile_data() can accept start/end date or days_back/duration parameters
-    raw_data = compile_data(days_back=21, duration=21)
-    data_writer(NASA_FILEPATH, raw_data)
+    # raw_data = compile_data(days_back=21, duration=300)
+
+    # data_writer(NASA_FILEPATH, raw_data)
+    
     # Prepare weather data (expects NASA_FILEPATH data)
     return prepare_weather(NASA_FILEPATH)
+
 
 # Load NASA data (14 to 7 days ago)
 nasa_weather_df = load_nasa_data()
@@ -50,4 +53,4 @@ model = AquaCropModel(sim_start_time=sim_start_date,
 # run model till termination
 model.run_model(till_termination=True)
 
-print(model._outputs.water_flux.head(10))
+print(model._outputs.water_flux[model._outputs.water_flux["dap"] != 0].tail(10))

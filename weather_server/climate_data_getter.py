@@ -9,13 +9,12 @@ def fetch_weather_data(lat, lon, days_back, duration):
         print("INVALID PARAM INPUT, MUST BE POSITIVE")
         return None
 
-
     """Fetch weather data from NASA POWER API"""
     today = datetime.date.today()
 
     # Start_date is 67 days ago, fetch data for 2 months, by default
     start_date = today - datetime.timedelta(days=days_back)
-    end_date = start_date +  datetime.timedelta(days=(duration))
+    end_date = today
         
     base_url = "https://power.larc.nasa.gov/api/temporal/daily/point"
     
