@@ -3,8 +3,7 @@ import os
 
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
-from pathlib import Path
-from weather import get_server_root, get_climate_data_path
+from paths import get_server_root, get_climate_data_path
 
 # OpenWeatherMap config
 if os.getenv("GITHUB_ACTIONS") != "true":
