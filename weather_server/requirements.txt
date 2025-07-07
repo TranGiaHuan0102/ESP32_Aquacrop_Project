@@ -2,3 +2,4 @@ requests
 dotenv
 aquacrop
 pandas
+db-sqlite3

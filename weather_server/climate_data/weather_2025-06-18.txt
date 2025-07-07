@@ -1,0 +1,2 @@
+Day	Month	Year	Tmin(C)	Tmax(C)	Prcp(mm)	Et0(mm)
+18	6	2025	24.72	27.39	10.22	6.09

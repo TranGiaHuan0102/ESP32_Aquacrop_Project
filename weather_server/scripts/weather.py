@@ -4,14 +4,9 @@ import math
 
 from datetime import datetime
 from dotenv import load_dotenv
-from pathlib import Path
-
-def get_server_root():
-    # Get the directory where this script is located
-    return Path(__file__).resolve().parent.parent
-
-def get_climate_data_path():
-    return str(get_server_root() / "climate_data")
+from database import get_database_path
+from paths import get_climate_data_path, get_server_root
+from database import get_database_path, initialize_database, write_to_database, get_from_database
 
 # OpenWeatherMap config
 if os.getenv("GITHUB_ACTIONS") != "true":
@@ -149,139 +144,51 @@ def fetch_weather_forecast():
 
 def write_forecast_data(forecast_data, base_dir=None):
     """
-    Write forecast data to .txt files with max 7 entries per file
-    Creates new files when current file reaches 7 entries
-    Prevents duplicate entries by checking existing dates
+    Write forecast data to SQLite database
+    Replaces existing entries for the same date with new data
+    Data is automatically sorted by datetime column
     """
-    if base_dir is None:
-        base_dir = get_climate_data_path()
 
     if not forecast_data:
         print("No forecast data to write")
         return None
 
-    # Ensure directory exists
-    os.makedirs(base_dir, exist_ok=True)
-    
-    # Get all existing weather files and find the latest one
-    weather_files = [f for f in os.listdir(base_dir) if f.startswith('weather_') and f.endswith('.txt')]
-    
-    current_file = None
-    current_entries = 0
-    existing_dates = set()
-    
-    if weather_files:
-        # Sort by modification time to get the latest file
-        weather_files.sort(key=lambda x: os.path.getmtime(os.path.join(base_dir, x)), reverse=True)
-        latest_file = weather_files[0]
-        latest_path = os.path.join(base_dir, latest_file)
-        
-        # Read existing file to get current entries and dates
-        try:
-            with open(latest_path, 'r') as f:
-                lines = f.readlines()
-                current_entries = len(lines) - 1  # subtract header
+    # Locate and initialize database
+    db_path = get_database_path()
+    initialize_database(db_path)
 
-                # Extract existing dates (skip header)
-                for line in lines[1:]:
-                    if line.strip():
-                        parts = line.strip().split('\t')
-                        if len(parts) >= 3:
-                            day, month, year = int(parts[0]), int(parts[1]), int(parts[2])
-                            existing_dates.add((day, month, year))
-        except:
-            current_entries = 0
-            existing_dates = set()
-        
-        if current_entries < 7:
-            current_file = latest_path
-            print(f"Found existing file with {current_entries} entries: {latest_file}")
-    
     # Convert forecast data to the required format
     formatted_data = []
     for day_dict in forecast_data:
         for date_str, weather in day_dict.items():
             dt = datetime.strptime(date_str, "%Y-%m-%d")
-            date_tuple = (dt.day, dt.month, dt.year)
+            datetime_str = dt.strftime("%Y-%m-%d")  # Standardized format
             
-            # Only add if date doesn't already exist
-            if date_tuple not in existing_dates:
-                formatted_data.append({
-                    'day': dt.day,
-                    'month': dt.month,
-                    'year': dt.year,
-                    'tmin': weather['tmin'],
-                    'tmax': weather['tmax'],
-                    'prcp': weather['precipitation'],
-                    'eto': weather['eto']
-                })
-            else:
-                print(f"Skipping duplicate date: {dt.day}/{dt.month}/{dt.year}")
+            formatted_data.append({
+                'day': dt.day,
+                'month': dt.month,
+                'year': dt.year,
+                'datetime': datetime_str,
+                'tmin': weather['tmin'],
+                'tmax': weather['tmax'],
+                'prcp': weather['precipitation'],
+                'eto': weather['eto']
+            })
     
-    if not formatted_data:
-        print("No new data to write (all dates already exist)")
-        return True
+    # Write this data to the database
+    write_to_database(db_path, formatted_data)
     
-    # Determine how many entries we can add to current file
-    if current_file and current_entries < 7:
-        entries_to_add = min(len(formatted_data), 7 - current_entries)
-        
-        # Append to existing file
-        with open(current_file, 'a') as f:
-            for i in range(entries_to_add):
-                data = formatted_data[i]
-                line = f"{data['day']}\t{data['month']}\t{data['year']}\t{data['tmin']}\t{data['tmax']}\t{data['prcp']}\t{data['eto']}"
-                # Add newline except for the last entry if it would make the file complete (7 entries)
-                if i < entries_to_add - 1 or (current_entries + entries_to_add) < 7:
-                    line += "\n"
-                f.write(line)
-        
-        print(f"Added {entries_to_add} new entries to {current_file}")
-        
-        # Remove processed entries
-        formatted_data = formatted_data[entries_to_add:]
-    
-    # Create new files for remaining data
-    while formatted_data:
-        # Take up to 7 entries for new file
-        batch = formatted_data[:7]
-        formatted_data = formatted_data[7:]
-        
-        # Create filename based on first date in batch
-        first_date = f"{batch[0]['year']}-{batch[0]['month']:02d}-{batch[0]['day']:02d}"
-        filename = f"weather_{first_date}.txt"
-        filepath = os.path.join(base_dir, filename)
-        
-        # Write new file
-        with open(filepath, 'w') as f:
-            # Write header
-            f.write("Day\tMonth\tYear\tTmin(C)\tTmax(C)\tPrcp(mm)\tEt0(mm)\n")
-            
-            # Write data
-            for data in batch:
-                f.write(f"{data['day']}\t{data['month']}\t{data['year']}\t{data['tmin']}\t{data['tmax']}\t{data['prcp']}\t{data['eto']}\n")
-        
-        print(f"Created new file: {filename} with {len(batch)} entries")
-    
-    return True
-        
-def main():
-    print("Fetching 5-7 day weather forecast...")
-    
-    # Get forecast data
-    forecast_data = fetch_weather_forecast()
-    
-    if forecast_data:
-        print(f"Retrieved {len(forecast_data)} days of forecast data:")
-        for day_dict in forecast_data:
-            for date, weather in day_dict.items():
-                print(f"{date}: Tmax={weather['tmax']}°C, Tmin={weather['tmin']}°C, "
-                      f"Precip={weather['precipitation']}mm, ETo={weather['eto']}mm")
-        
-        # Write forecast data to files
-        write_forecast_data(forecast_data)
-    else:
-        print("Failed to fetch forecast data.")
+def get_forecast_data(start_date=None, end_date=None, base_dir=None):
+    """
+    Retrieve weather data from database, optionally filtered by date range
+    Returns data sorted by datetime
+    """
+    db_path = get_database_path(base_dir)
 
-if __name__ == "__main__":
-    main()
+    if not os.path.exists(db_path):
+        print("Database does not exist")
+        return []
+    
+    retrived_data = get_from_database(start_date, end_date, db_path)
+
+    return retrived_data
