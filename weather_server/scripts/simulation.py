@@ -3,7 +3,7 @@ from aquacrop import AquaCropModel, Soil, Crop, InitialWaterContent
 from aquacrop.utils import prepare_weather
 from datetime import datetime, timedelta
 from paths import get_climate_data_path
-from weather import get_forecast_data
+from database import get_from_database
 
 def run_simulation(base_dir=get_climate_data_path(), days_ahead=4):
     """
@@ -16,7 +16,7 @@ def run_simulation(base_dir=get_climate_data_path(), days_ahead=4):
         target_date = start_date + timedelta(days=days_ahead)
         
         # Get all weather files sorted by date
-        weather_files = get_forecast_data(start_date=start_date, end_date=target_date)
+        weather_files = get_from_database(start_date=start_date, end_date=target_date)
         
         # Check if we have enough data
         if len(weather_files) < days_ahead:
@@ -37,10 +37,14 @@ def run_simulation(base_dir=get_climate_data_path(), days_ahead=4):
                 f.write(f"{data['day']}\t{data['month']}\t{data['year']}\t{data['tmin']}\t{data['tmax']}\t{data['prcp']}\t{data['eto']}\n")
         
         # Run aquacrop simulation on weather file
-        aquacrop_simulation(temp_weather_file)
+        simulation_table = aquacrop_simulation(temp_weather_file)
 
-        # Remove temp_aquacrop
-        os.remove(temp_weather_file)
+        # Determine whether to water today or not
+        irrigation_today = irrigation_decision(simulation_table)
+
+        print(irrigation_today)
+
+        return irrigation_today
 
     except Exception as e:
         print(f"Error in aquacrop_process: {e}")
@@ -90,9 +94,24 @@ def aquacrop_simulation(filepath):
 
     # Get water flux results 
     water_flux_results = model._outputs.water_flux[model._outputs.water_flux["dap"] != 0].tail(10)
-    print("AquaCrop simulation completed!")
-    print(water_flux_results)
+    return water_flux_results
 
+def irrigation_decision(simulation_table, growth_stage=None):
+    # Thresholds for maize (adjust based on soil type)
+    if growth_stage == "flowering":
+        critical_wr = 50 
+    elif growth_stage == "vegetative":
+        critical_wr = 40
+    else:
+        critical_wr = 45
+    
+    # Decision logic
+    WR_day5 = simulation_table["Wr"].iloc[-1]
+    if WR_day5 < critical_wr:
+        return True
+    else:
+        return False
+       
 def main():
     run_simulation()
 
