@@ -82,18 +82,18 @@ def write_to_database(db_path, formatted_data):
     print(f"Database operation completed: {inserted_count} inserted, {updated_count} updated")
     return True
 
-def get_from_database(start_date, end_date, db_path):
+def get_from_database(start_date, end_date, db_path=get_database_path()):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    if start_date:
+    if start_date and end_date:
         # Just filter by start_date - ignore end_date if it exceeds available data
         cursor.execute('''
             SELECT day, month, year, datetime, tmin, tmax, prcp, eto, created_at, updated_at
             FROM weather_data 
-            WHERE datetime >= ?
+            WHERE datetime >= ? AND datetime <= ?
             ORDER BY datetime
-        ''', (start_date,))
+        ''', (start_date, end_date))
     else:
         cursor.execute('''
             SELECT day, month, year, datetime, tmin, tmax, prcp, eto, created_at, updated_at

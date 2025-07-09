@@ -142,17 +142,16 @@ def fetch_weather_forecast():
         print(f"Error fetching weather forecast: {e}")
         return []
 
-def write_forecast_data(forecast_data, base_dir=None):
+def write_forecast_data(forecast_data=None, base_dir=None):
     """
     Write forecast data to SQLite database
     Replaces existing entries for the same date with new data
     Data is automatically sorted by datetime column
     """
 
-    if not forecast_data:
-        print("No forecast data to write")
-        return None
-
+    if forecast_data is None:
+        forecast_data = fetch_weather_forecast()
+        
     # Locate and initialize database
     db_path = get_database_path()
     initialize_database(db_path)
@@ -192,3 +191,6 @@ def get_forecast_data(start_date=None, end_date=None, base_dir=None):
     retrived_data = get_from_database(start_date, end_date, db_path)
 
     return retrived_data
+
+if __name__ == '__main__':
+    write_forecast_data()
