@@ -2,61 +2,44 @@ import os
 from aquacrop import AquaCropModel, Soil, Crop, InitialWaterContent
 from aquacrop.utils import prepare_weather
 from datetime import datetime, timedelta
-from paths import get_climate_data_path
-from database import get_from_database
+from mongodb import get_database
 
-def run_simulation(base_dir=get_climate_data_path(), days_ahead=4):
+def run_simulation(days_ahead=4):
     """
     Find the next 5 days of weather data and run AquaCrop simulation
     Handles edge cases where data may span across multiple files
     """
     try:
-        # Get current date (tomorrow since forecasts start from tomorrow)
-        start_date = datetime.now() - timedelta(days=1)
+        start_date = datetime.now()
         target_date = start_date + timedelta(days=days_ahead)
+        weather_documents = get_database(start_date, target_date)
+        temp_weather_file = create_aquacrop_weather_file(weather_documents)
         
-        # Get all weather files sorted by date
-        weather_files = get_from_database(start_date=start_date, end_date=target_date)
-        
-        # Check if we have enough data
-        if len(weather_files) < days_ahead:
-            print(f"Warning: Only found {len(weather_files)} days of data, need {days_ahead}")
-            if len(weather_files) == 0:
-                print("No data found for the target dates")
-                return None
-
-        # Create temporary weather file for AquaCrop
-        temp_weather_file = os.path.join(base_dir, "temp_aquacrop_weather.txt")
-
-        with open(temp_weather_file, 'w') as f:
-            # Write header
-            f.write("Day\tMonth\tYear\tTmin(C)\tTmax(C)\tPrcp(mm)\tEt0(mm)\n")
-            
-             # Write data rows
-            for data in weather_files:
-                f.write(f"{data['day']}\t{data['month']}\t{data['year']}\t{data['tmin']}\t{data['tmax']}\t{data['prcp']}\t{data['eto']}\n")
-        
-        # Run aquacrop simulation on weather file
-        simulation_table = aquacrop_simulation(temp_weather_file)
-
-        # Determine whether to water today or not
-        irrigation_today = irrigation_decision(simulation_table)
-
-        print(irrigation_today)
-
-        return irrigation_today
+        try:
+            result = aquacrop_simulation(temp_weather_file)
+            irrigation_today =  irrigation_decision(result)     # Boolean value
+            return irrigation_today
+        finally:
+            os.remove(temp_weather_file)
 
     except Exception as e:
-        print(f"Error in aquacrop_process: {e}")
+        print(f"Error retrieving data from MongoDB: {e}")
         return None
-    
-    finally:
-        # Always try to remove temp file if it was created
-        if temp_weather_file and os.path.exists(temp_weather_file):
-            try:
-                os.remove(temp_weather_file)
-            except Exception as e:
-                print(f"Warning: Could not remove temp file {temp_weather_file}: {e}")
+
+def create_aquacrop_weather_file(weather_documents):
+    # Create temporary weather file for AquaCrop
+    temp_weather_file = "temp_aquacrop_weather.txt"
+
+    with open(temp_weather_file, 'w') as f:
+        # Write header
+        f.write("Day\tMonth\tYear\tTmin(C)\tTmax(C)\tPrcp(mm)\tEt0(mm)\n")
+        
+            # Write data rows
+        for docu in weather_documents:
+            data = docu["weather"]
+            f.write(f"{data['day']}\t{data['month']}\t{data['year']}\t{data['tmin']}\t{data['tmax']}\t{data['prcp']}\t{data['eto']}\n")
+
+    return temp_weather_file
 
 def aquacrop_simulation(filepath):
     # Prepare weather data for AquaCrop
@@ -89,13 +72,12 @@ def aquacrop_simulation(filepath):
                               crop=wheat,
                               initial_water_content=InitWC)
     
-    # Run model till termination
     model.run_model(till_termination=True)
 
     # Get water flux results 
     water_flux_results = model._outputs.water_flux[model._outputs.water_flux["dap"] != 0].tail(10)
     return water_flux_results
-
+    
 def irrigation_decision(simulation_table, growth_stage=None):
     # Thresholds for maize (adjust based on soil type)
     if growth_stage == "flowering":
@@ -111,9 +93,4 @@ def irrigation_decision(simulation_table, growth_stage=None):
         return True
     else:
         return False
-       
-def main():
-    run_simulation()
 
-if __name__ == '__main__':
-    main()

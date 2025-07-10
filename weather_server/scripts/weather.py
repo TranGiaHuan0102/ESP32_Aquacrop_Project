@@ -4,16 +4,14 @@ import math
 
 from datetime import datetime
 from dotenv import load_dotenv
-from database import get_database_path
-from paths import get_climate_data_path, get_server_root
-from database import get_database_path, initialize_database, write_to_database, get_from_database
+from paths import get_server_root
+from mongodb import write_database
 
 # OpenWeatherMap config
 if os.getenv("GITHUB_ACTIONS") != "true":
     server_root = get_server_root()    
     load_dotenv(dotenv_path=server_root / 'env/OpenWeather.env')
-
-
+    
 API_KEY = os.getenv("API_KEY")
 CITY = os.getenv("CITY")
 COUNTRY_CODE = os.getenv("COUNTRY_CODE")
@@ -150,11 +148,7 @@ def write_forecast_data(forecast_data=None, base_dir=None):
     """
 
     if forecast_data is None:
-        forecast_data = fetch_weather_forecast()
-        
-    # Locate and initialize database
-    db_path = get_database_path()
-    initialize_database(db_path)
+        forecast_data = fetch_weather_forecast()    # List of data dictionaries     
 
     # Convert forecast data to the required format
     formatted_data = []
@@ -174,23 +168,4 @@ def write_forecast_data(forecast_data=None, base_dir=None):
                 'eto': weather['eto']
             })
     
-    # Write this data to the database
-    write_to_database(db_path, formatted_data)
-    
-def get_forecast_data(start_date=None, end_date=None, base_dir=None):
-    """
-    Retrieve weather data from database, optionally filtered by date range
-    Returns data sorted by datetime
-    """
-    db_path = get_database_path(base_dir)
-
-    if not os.path.exists(db_path):
-        print("Database does not exist")
-        return []
-    
-    retrived_data = get_from_database(start_date, end_date, db_path)
-
-    return retrived_data
-
-if __name__ == '__main__':
-    write_forecast_data()
+    write_database(formatted_data)

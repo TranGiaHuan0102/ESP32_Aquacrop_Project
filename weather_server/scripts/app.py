@@ -1,10 +1,12 @@
 import requests
 import os
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from dotenv import load_dotenv
-from paths import get_server_root, get_climate_data_path
-from database import get_from_database
+from paths import get_server_root
+from mongodb import get_database
+from weather import write_forecast_data
+from simulation import run_simulation
 
 # OpenWeatherMap config
 if os.getenv("GITHUB_ACTIONS") != "true":
@@ -17,15 +19,15 @@ RAIN_FEED = os.getenv("RAIN_FEED")
 TEMP_FEED = os.getenv("TEMP_FEED")
 ET0_FEED = os.getenv("ET0_FEED")
 DAY_FEED = os.getenv("DAY_FEED")
+DECISION_FEED = os.getenv("DECISION_FEED")
 AIO_BASE_URL = f"https://io.adafruit.com/api/v2/{ADAFRUIT_IO_USERNAME}/feeds"
 
-def update_today_weather(base_dir=get_climate_data_path()):
-    today = datetime.now() - timedelta(days=1)
+def update_today_weather():
+    today = datetime.now()
     
-    # Get today weather (return type is a list of dicts, so take first element)
-    today_weather = get_from_database(start_date=today, end_date=(today + timedelta(days=1)))[0]
+    today_weather = get_database(start_date=today, end_date=today)[0]      # [{"weather": {}}]
 
-    return today_weather
+    return today_weather["weather"]
 
 def send_to_adafruit(feed_key, value):
     url = f"{AIO_BASE_URL}/{feed_key}/data"
@@ -42,15 +44,22 @@ def send_to_adafruit(feed_key, value):
         print(f"Error sending to Adafruit IO: {e}")
 
 def main():
+    # Step 1: Update weather data
+    write_forecast_data()
+
+    # Step 2: Get today's data and run simulation
     today_weather = update_today_weather()
-
-    print(today_weather)
-
+    irrigation_decison = run_simulation()       # Simulation returns a boolean value
+    
     if today_weather:
         send_to_adafruit(RAIN_FEED, today_weather['prcp'])
         send_to_adafruit(TEMP_FEED, ((today_weather['tmin'] + today_weather['tmax']) / 2))
         send_to_adafruit(ET0_FEED, today_weather["eto"])
         send_to_adafruit(DAY_FEED, today_weather["datetime"])
+        if irrigation_decison:
+            send_to_adafruit(DECISION_FEED, "ON")
+        else:
+            send_to_adafruit(DECISION_FEED, "OFF")
     else:
         print("Failing to fetch today's weather data!")
 
