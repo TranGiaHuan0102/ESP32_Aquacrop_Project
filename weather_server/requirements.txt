@@ -2,5 +2,4 @@ requests
 dotenv
 aquacrop
 pandas
-db-sqlite3
 pymongo
