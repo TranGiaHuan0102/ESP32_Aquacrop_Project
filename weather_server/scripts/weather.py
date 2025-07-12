@@ -95,10 +95,6 @@ def fetch_weather_forecast():
             snow = entry.get("snow", {}).get("3h", 0.0)
             daily_data[date_str]["precipitation"] += (rain + snow)
             
-            # Collect other meteorological data
-            daily_data[date_str]["humidity"].append(entry["main"]["humidity"])
-            daily_data[date_str]["wind_speed"].append(entry["wind"]["speed"])
-        
         # Process daily data and calculate ETo
         forecast_list = []
         
@@ -167,5 +163,5 @@ def write_forecast_data(forecast_data=None, base_dir=None):
                 'prcp': weather['precipitation'],
                 'eto': weather['eto']
             })
-    
+            
     write_database(formatted_data)

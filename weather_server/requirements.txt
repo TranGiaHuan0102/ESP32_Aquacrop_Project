@@ -4,3 +4,5 @@ aquacrop
 pandas
 db-sqlite3
 pymongo
+adafruit-io
+setuptools
