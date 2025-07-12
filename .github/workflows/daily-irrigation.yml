@@ -37,7 +37,9 @@ jobs:
         DAY_FEED: ${{ secrets.DAY_FEED }}
         DECISION_FEED: ${{ secrets.DECISION_FEED }}
         MONGODB_URI: ${{ secrets.MONGODB_URI }}
-        OPENWEATHER_API_KEY: ${{ secrets.OPENWEATHER_API_KEY }}
+        API_KEY: ${{ secrets.API_KEY }}  
+        CITY: ${{ secrets.CITY }}                   
+        COUNTRY_CODE: ${{ secrets.COUNTRY_CODE }}
       run: |
         cd weather_server/scripts
         python app.py
